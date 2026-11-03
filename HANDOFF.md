@@ -131,6 +131,37 @@ Ghi chú:
 ## 5. BUG CÒN MỞ (ưu tiên từ trên xuống)
 
 ### 5.1 ⚠️ Thế giới 3D đen tuyền trong gameplay (BUG CHÍNH)
+
+**CẬP NHẬT 2026-11-03 (đã khoanh vùng được, quan trọng):**
+Dùng `DM_VK_PASSDUMP=2000` (+`DM_VK_PASSDUMP_DEPTH=1`) để dump từng render target của 1 frame trong gameplay:
+
+| Pass (dump) | Size | Format | Mean luminance | Ý nghĩa |
+|---|---|---|---|---|
+| 01–04, 06, 08… | 768×436 | depth (129) | — | các pass depth |
+| **07** (và 05/09/11/18/20/22/28…) | 768×436 | **122 = B10G11R11_UFLOAT** (HDR scene color) | **20.2/255** | **CẢNH ĐƯỢC RENDER ĐÚNG**: thấy rõ hang, đá, bậc thang, nhân vật, quả cầu sáng |
+| 13, 15 | 768×436 | 9 = R8_UNORM | 253 / 238 | mask/white texture |
+| 23–26 | 32×32 | 97 = R16G16B16A16_SFLOAT | 82.6 / **255 255 255** | chuỗi luminance/bloom — **bão hoà trắng** |
+| 37 → 44 | 384×218 → 6×7 (mip down) | 97 | **14.35 → 1.5 → 1.0** | bloom down-sample: **mất ~10× độ sáng ở đây** |
+| 45 → 57 | 12×7 → 768×436 (mip up) | 97 | 0.0 → 1.85 → 0.44 | up-sample |
+| 58 | 1280×720 | 37 = R8G8B8A8_UNORM | **0.20** | composite: **bị crush ~100×** |
+| 59 | 1280×720 | 37 | 0.78 | composite + UI (UI vẫn sáng bình thường) |
+
+Ảnh chứng cứ: pass 07 render đúng cảnh (`pd_07.png`), pass 58 gần như đen (`pd_58.png`).
+
+**Đã loại trừ:**
+- Không phải present: ép swapchain sang `R8G8B8A8_SRGB` (`DM_VK_PRESENT_SRGB=1`) làm title **bạt màu/over-bright** ⇒ pixel guest đã là sRGB, đường present đúng.
+- Không phải thiếu shader: `skipped (no program) = 0` ở cảnh này, **không** có dòng `dispatch with no compute shader`.
+- Không phải zero-copy/cache sync: đã thử `DM_VK_NO_ZEROCOPY=1`, hành vi đen không đổi.
+- Không phải brightness: game Brightness = 10/10 + màn hình 255/255, output vẫn 0.2/255.
+
+**Kết luận:** cảnh render đúng ở HDR scene color (B10G11R11), nhưng **chuỗi post-process (luminance/eye-adaptation → tonemap)** kéo tụt ~100×. Chuỗi luminance 32×32 bão hoà **trắng = 1.0** ⇒ auto-exposure tưởng cảnh rất sáng nên chọn exposure cực nhỏ → world đen, UI (vẽ sau tonemap) không bị ảnh hưởng.
+
+**Bước tiếp theo (cụ thể):**
+1. `DM_VK_TRACE_PASS=<pass>` / `DM_VK_TRACE_PASS=-2` để lấy **shader key** của các pass 23–26 (luminance) và 37/38 (nơi mất 10×) → đối chiếu với danh sách shader UE.
+2. Dump riêng chuỗi luminance: `DM_VK_PASSDUMP_SIZE=32x32,384x218` và so giá trị với scene color (B10G11R11). Nghi vấn: pass luminance **sample scene color sai** (format pack B10G11R11 hoặc dummy view) → trả 1.0.
+3. So sánh cùng chuỗi này ở **title screen** (render đúng) để thấy pass nào khác biệt.
+4. Nếu là texture bind sai → kiểm tra `vkshader_t`/`stage_set` cho target B10G11R11 và các view dummy.
+
 Bằng chứng đo được:
 - Độ sáng trung bình khung hình trong game: **0.11 / 255** (đen tuyệt đối, không phải "tối") — đo 2 lần cách 25 s; khi thoát khỏi màn game đo được 182/255.
 - Title screen: render **hoàn hảo**, `skipped (no program) = 0` trên 129.570 draw, màu đúng.
