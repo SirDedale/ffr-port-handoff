@@ -156,6 +156,14 @@ Dùng `DM_VK_PASSDUMP=2000` (+`DM_VK_PASSDUMP_DEPTH=1`) để dump từng render
 
 **Kết luận:** cảnh render đúng ở HDR scene color (B10G11R11), nhưng **chuỗi post-process (luminance/eye-adaptation → tonemap)** kéo tụt ~100×. Chuỗi luminance 32×32 bão hoà **trắng = 1.0** ⇒ auto-exposure tưởng cảnh rất sáng nên chọn exposure cực nhỏ → world đen, UI (vẽ sau tonemap) không bị ảnh hưởng.
 
+**CẬP NHẬT 2 (texel buffer misaligned — manh mối mạnh):**
+- Log: `[RED] buffer texture not in a pool or misaligned (format 0xa, 44 elements, inpool 1 off 0x1000c8 align 0x40 bpb 4)`
+  ⇒ texel buffer **nằm trong pool nhưng offset lệch 8 byte** so với `minTexelBufferOffsetAlignment = 64`.
+  Port cũ bind **dummy view** cho nó ⇒ shader đọc dữ liệu sai (nghi là bảng thông số post-process/brightness, 44 phần tử).
+- Đã thêm fix thử nghiệm `DM_VK_TBUF_FIX=1` (copy 176 byte sang scratch căn lề rồi tạo BufferView) — **cảnh hang KHÔNG sáng lên**, nhưng title đổi độ sáng ⇒ buffer này có tham gia chuỗi post.
+  ⇒ Hướng đúng: buffer phải được **cập nhật mỗi frame** (guest ghi lại mỗi frame; bản scratch hiện tại là ảnh chụp một lần ⇒ stale). Cần buffer persistent + copy mỗi submission, hoặc map thẳng vùng nhớ căn lề.
+- Quan sát phụ: **đổi Brightness trong game (0↔10) không làm thay đổi độ sáng ảnh** ⇒ giá trị gain của tonemap đang là hằng số sai (khớp với việc exposure bị crush).
+
 **Bước tiếp theo (cụ thể):**
 1. `DM_VK_TRACE_PASS=<pass>` / `DM_VK_TRACE_PASS=-2` để lấy **shader key** của các pass 23–26 (luminance) và 37/38 (nơi mất 10×) → đối chiếu với danh sách shader UE.
 2. Dump riêng chuỗi luminance: `DM_VK_PASSDUMP_SIZE=32x32,384x218` và so giá trị với scene color (B10G11R11). Nghi vấn: pass luminance **sample scene color sai** (format pack B10G11R11 hoặc dummy view) → trả 1.0.
