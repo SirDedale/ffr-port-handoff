@@ -1,18 +1,18 @@
-# FF Resonance (Switch → Android) — handoff cho port trên Anbernic RG477M
+# FF Resonance (Switch → Android) — handoff for the port on Anbernic RG477M
 
-Repo này chỉ chứa **note bàn giao** (không chứa ROM, không chứa APK, không chứa dữ liệu game).
+This repo contains only **handoff notes** (no ROM, no APK, no game data).
 
-- Máy đích: Anbernic RG477M — Dimensity 8300 / Mali-G615 / Android 14 — 1280×960
+- Target device: Anbernic RG477M — Dimensity 8300 / Mali-G615 / Android 14 — 1280×960
 - Game: FINAL FANTASY RESONANCE, TitleID `0100B8A026F14000`, package `org.nx2a.t0100b8a026f14000`
-- Engine: nx2android (nxnative/dm) + bcn layer, dump bản Asia [AS] v0
+- Engine: nx2android (nxnative/dm) + bcn layer, Asia [AS] v0 dump
 
-## Đọc gì trước
+## What to read first
 
-1. **[`HANDOFF.md`](HANDOFF.md)** — toàn bộ trạng thái: đã fix gì (kèm bằng chứng), bug còn mở, cách build/đo, điều cấm.
-2. Mục **5.1** trong HANDOFF là bug chính cần làm tiếp: **thế giới 3D đen tuyệt đối trong gameplay** (đo được 0.11/255), trong khi **title screen render hoàn hảo**.
+1. **[`HANDOFF.md`](HANDOFF.md)** — full status: what's been fixed (with evidence), open bugs, how to build/measure, things not to do.
+2. Section **5.1** in HANDOFF is the main bug to work on next: **absolute black 3D world during gameplay** (measured 0.11/255), while the **title screen renders perfectly**.
 
-## Tóm tắt 30 giây
+## 30-second summary
 
-- Đã fix: stuck splash (2 nguyên nhân), rò rỉ RAM 37 MB/s (fd DMA-BUF không close), log spam, zero-copy cache sync, barrier hẹp (Giai đoạn 2).
-- Còn mở: world 3D đen trong gameplay (không phải thiếu shader — đã thử null-FS, skip 0 mà vẫn đen), text tiếng Anh (dump AS không có), FPS 10–21.
-- Cấu hình đang chạy an toàn: xem HANDOFF mục 3.
+- Fixed: stuck splash (2 causes), 37 MB/s RAM leak (unclosed DMA-BUF fd), log spam, zero-copy cache sync, narrow barrier (Phase 2).
+- Still open: black 3D world during gameplay (not a missing shader — null-FS and skip=0 were tried, still black), English text (not present in the AS dump), FPS 10–21.
+- Currently running safe configuration: see HANDOFF section 3.
